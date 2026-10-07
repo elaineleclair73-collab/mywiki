@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Worldkeeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400;1,500&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E6EAE3; --paper:#F8F9F5; --paper2:#EFF2EC; --ink:#1D2A2C; --muted:#586869; --rule:#C7D0CA;
+  --accent:#2F7D6D; --accent-ink:#FFFFFF; --red:#A23B3B; --gold:#A87A1E; --shadow:0 1px 0 rgba(29,42,44,.06);
+  --c-character:#4352A0; --c-place:#2A7565; --c-event:#A23B3B; --c-faction:#76448A; --c-item:#8E620E; --c-creature:#4A752A; --c-lore:#55656D;
+  --serif:'Alegreya', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans:'Alegreya Sans', 'Gill Sans', 'Segoe UI', 'Trebuchet MS', sans-serif;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131C1E; --paper:#1A2527; --paper2:#162022; --ink:#E2E9E4; --muted:#93A4A2; --rule:#2F403D;
+    --accent:#5DB8A2; --accent-ink:#0E1A18; --red:#E3897F; --gold:#D9AE5C; --shadow:none;
+    --c-character:#97A4EA; --c-place:#6CC6B0; --c-event:#E8928A; --c-faction:#CBA0DC; --c-item:#DDB463; --c-creature:#A3CF7A; --c-lore:#AAB8BF;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131C1E; --paper:#1A2527; --paper2:#162022; --ink:#E2E9E4; --muted:#93A4A2; --rule:#2F403D;
+  --accent:#5DB8A2; --accent-ink:#0E1A18; --red:#E3897F; --gold:#D9AE5C; --shadow:none;
+  --c-character:#97A4EA; --c-place:#6CC6B0; --c-event:#E8928A; --c-faction:#CBA0DC; --c-item:#DDB463; --c-creature:#A3CF7A; --c-lore:#AAB8BF;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:17px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.c-character{--cc:var(--c-character)} .c-place{--cc:var(--c-place)} .c-event{--cc:var(--c-event)} .c-faction{--cc:var(--c-faction)}
+.c-item{--cc:var(--c-item)} .c-creature{--cc:var(--c-creature)} .c-lore{--cc:var(--c-lore)}
+
+/* shell */
+.shell{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:100%}
+.side{position:sticky;top:env(safe-area-inset-top,0px);height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;background:var(--paper2);border-right:1px solid var(--rule);padding:22px 16px 24px;display:flex;flex-direction:column;gap:18px}
+.main{min-width:0;padding:36px clamp(18px,4vw,60px) 96px}
+.topbar{display:none}
+.brand a{display:block;font-family:var(--serif);font-weight:800;font-size:1.45rem;line-height:1.1;color:var(--ink);text-decoration:none}
+.brand small{display:block;color:var(--muted);font-size:.85rem;margin-top:3px}
+.search{position:relative}
+.search input{width:100%;padding:9px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--paper)}
+.results{display:flex;flex-direction:column;gap:2px}
+.results:empty{display:none}
+.nav{display:flex;flex-direction:column;gap:1px}
+.navlink{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:7px;color:var(--ink);text-decoration:none}
+.navlink:hover{background:var(--paper)}
+.navlink.on{background:var(--paper);box-shadow:inset 3px 0 0 var(--cc,var(--accent))}
+.navlink .dot{width:9px;height:9px;border-radius:50%;background:var(--cc,var(--muted));flex:none}
+.navlink .count{margin-left:auto;color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+.side h2{font-size:.95rem;font-weight:700;margin:0 0 6px 10px;color:var(--muted)}
+.side .empty{color:var(--muted);font-size:.9rem;margin:0 10px}
+.me{margin-top:auto;border-top:1px solid var(--rule);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.me-row{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.me-row small{display:block;color:var(--muted);font-size:.82rem}
+.sigil{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:var(--serif);font-weight:700;font-size:1.05rem;flex:none}
+.modenote{font-size:.8rem;color:var(--muted);line-height:1.4}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 15px;border-radius:8px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);text-decoration:none;cursor:pointer;font-weight:500;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:5px 10px;font-size:.9rem}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.danger{color:var(--red)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.btn.mark.on{color:var(--gold);border-color:var(--gold)}
+
+/* home */
+.hero{max-width:900px;padding:10px 0 34px;border-bottom:1px solid var(--rule);margin-bottom:34px}
+.world-title{font-family:var(--serif);font-weight:800;font-size:clamp(2.6rem,7vw,4.8rem);line-height:.98;margin:0 0 12px;letter-spacing:-.01em;overflow-wrap:anywhere}
+.tagline{font-family:var(--serif);font-style:italic;font-size:1.3rem;color:var(--muted);margin:0 0 20px;max-width:46ch}
+.hero .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.hero .stat{color:var(--muted);margin-right:8px}
+.demo{font-family:var(--serif);font-size:1.15rem;line-height:1.7;max-width:60ch;background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:16px 20px;margin:22px 0 0}
+.demo b{font-weight:500}
+.index{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:30px 34px;margin-bottom:44px}
+.cat-block h2{font-family:var(--serif);font-size:1.35rem;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid var(--cc);display:flex;align-items:baseline;justify-content:space-between}
+.cat-block h2 a{color:var(--ink);text-decoration:none}
+.cat-block h2 span{font-family:var(--sans);font-size:.85rem;color:var(--muted);font-weight:400}
+.cat-block ul{list-style:none;margin:0;padding:0}
+.cat-block li{padding:3px 0}
+.cat-block li a{color:var(--ink);text-decoration:none}
+.cat-block li a:hover{color:var(--cc);text-decoration:underline}
+.cat-block .more{font-size:.9rem;color:var(--cc)}
+.cat-block p{margin:0;color:var(--muted);font-size:.95rem}
+.cat-block p a{color:var(--cc)}
+.sec-title{font-family:var(--serif);font-size:1.6rem;margin:0 0 12px}
+.recent{max-width:760px}
+.recent ol{list-style:none;padding:0;margin:0}
+.recent li{display:flex;gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--rule)}
+.recent li a{font-family:var(--serif);font-size:1.12rem;color:var(--ink);text-decoration:none;font-weight:500}
+.recent li a:hover{color:var(--cc)}
+.recent .tag{font-size:.82rem;color:var(--cc)}
+.recent time{margin-left:auto;color:var(--muted);font-size:.88rem;white-space:nowrap}
+.inline-form{display:grid;gap:10px;max-width:520px;margin-top:14px;padding:16px;border:1px solid var(--rule);border-radius:10px;background:var(--paper)}
+
+/* category page */
+.page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:26px;border-bottom:3px solid var(--cc,var(--accent));padding-bottom:12px;max-width:1080px}
+.page-head h1{font-family:var(--serif);font-weight:800;font-size:clamp(2rem,5vw,3rem);margin:0;line-height:1}
+.letter{font-family:var(--serif);font-size:1.5rem;color:var(--cc);margin:22px 0 6px;font-weight:700}
+.alist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;max-width:1080px}
+.acard{display:flex;gap:12px;padding:10px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);text-decoration:none;color:var(--ink);align-items:flex-start}
+.acard:hover{border-color:var(--cc)}
+.acard .thumb{width:56px;height:56px;border-radius:7px;background:var(--paper2);flex:none;overflow:hidden;display:grid;place-items:center;color:var(--cc);font-family:var(--serif);font-weight:700;font-size:1.4rem}
+.acard .thumb img{width:100%;height:100%;object-fit:cover}
+.acard b{font-family:var(--serif);font-size:1.1rem;font-weight:700;display:block;line-height:1.2}
+.acard span{display:block;color:var(--muted);font-size:.9rem;line-height:1.35;margin-top:2px}
+
+/* article */
+.article{max-width:1100px}
+.crumbs{font-size:.92rem;margin-bottom:4px}
+.crumbs a{color:var(--cc);text-decoration:none;font-weight:500}
+.art-head{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:6px}
+.art-head h1{font-family:var(--serif);font-weight:800;font-size:clamp(2.2rem,5.5vw,3.5rem);line-height:1.02;margin:0;overflow-wrap:anywhere}
+.art-head .actions{display:flex;gap:8px;padding-top:8px}
+.aka{color:var(--muted);margin:6px 0 0;font-size:.95rem}
+.art-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:44px;align-items:start;margin-top:22px}
+.prose{font-family:var(--serif);font-size:1.15rem;line-height:1.68;max-width:68ch;overflow-wrap:break-word}
+.prose .lead{font-size:1.28rem;line-height:1.55;color:var(--ink);margin-top:0}
+.prose h2{font-size:1.65rem;margin:1.6em 0 .4em;padding-bottom:4px;border-bottom:1px solid var(--rule);line-height:1.2}
+.prose h3{font-size:1.3rem;margin:1.3em 0 .3em}
+.prose blockquote{margin:1.2em 0;padding:4px 0 4px 18px;border-left:3px solid var(--cc,var(--rule));font-style:italic;color:var(--muted)}
+.prose hr{border:0;border-top:1px solid var(--rule);margin:2em 0}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose figure{margin:1.4em 0}
+.prose figure img{display:block;border-radius:8px;border:1px solid var(--rule);background:var(--paper2);min-height:40px}
+.prose figcaption{font-size:.95rem;color:var(--muted);margin-top:6px;font-style:italic}
+.prose figure.missing{display:none}
+.prose a[target]{color:var(--accent)}
+a.wl{color:var(--cc);text-decoration:underline;text-decoration-style:dotted;text-decoration-thickness:1.5px;text-underline-offset:3px;font-weight:500}
+a.wl:hover{text-decoration-style:solid}
+a.redlink{color:var(--red);text-decoration:underline;text-decoration-style:dashed;text-underline-offset:3px}
+.toc{display:inline-block;background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:12px 20px 12px 16px;margin:6px 0 10px;font-family:var(--sans);font-size:.98rem}
+.toc b{display:block;margin-bottom:4px}
+.toc ol{margin:0;padding-left:1.3em}
+.toc li.sub{margin-left:1em;list-style:circle}
+.toc a{color:var(--ink);text-decoration:none}
+.toc a:hover{color:var(--cc);text-decoration:underline}
+.infobox{background:var(--paper);border:1px solid var(--rule);border-top:5px solid var(--cc);border-radius:4px 4px 10px 10px;overflow:hidden;font-size:.96rem}
+.ib-title{font-family:var(--serif);font-weight:700;font-size:1.3rem;text-align:center;padding:12px 14px 10px;line-height:1.2}
+.ib-img{background:var(--paper2);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.ib-img img{display:block;width:100%;max-height:420px;object-fit:contain}
+.ib-img figcaption{padding:7px 12px;font-size:.88rem;color:var(--muted);text-align:center;font-style:italic}
+.ib-type{text-align:center;padding:6px;background:var(--cc);color:var(--paper);font-weight:700;font-size:.9rem}
+.infobox dl{margin:0;padding:6px 0}
+.infobox .ib-row{display:grid;grid-template-columns:40% 1fr;gap:10px;padding:6px 14px;border-top:1px solid var(--rule)}
+.infobox .ib-row:first-child{border-top:0}
+.infobox dt{font-weight:700}
+.infobox dd{margin:0;overflow-wrap:anywhere}
+.backlinks{margin-top:46px;max-width:800px}
+.backlinks h2{font-family:var(--serif);font-size:1.35rem;margin:0 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);text-decoration:none;font-size:.92rem}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--cc,var(--muted))}
+.chip:hover{border-color:var(--cc)}
+.chip.red{color:var(--red);border-style:dashed}
+.chip.red::before{background:var(--red)}
+.foot-meta{margin-top:40px;padding-top:14px;border-top:1px solid var(--rule);color:var(--muted);font-size:.92rem;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;max-width:1100px}
+
+/* editor */
+.editor h1{font-family:var(--serif);font-weight:800;font-size:clamp(1.8rem,4vw,2.5rem);margin:0 0 20px}
+.ed-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:32px;align-items:start;max-width:1160px}
+label.f{display:flex;flex-direction:column;gap:5px;font-weight:500;margin-bottom:14px}
+label.f small,.hint{font-weight:400;color:var(--muted);font-size:.86rem}
+.f input,.f select,.f textarea,.inline-form input,.ib-edit input{padding:9px 11px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);width:100%}
+.row2{display:grid;grid-template-columns:200px 1fr;gap:14px}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--rule);border-bottom:0;border-radius:8px 8px 0 0;background:var(--paper2)}
+.toolbar .sp{flex:1}
+#f-body{width:100%;min-height:380px;padding:14px;border:1px solid var(--rule);border-radius:0 0 8px 8px;background:var(--paper);font-family:var(--serif);font-size:1.08rem;line-height:1.6;resize:vertical}
+#f-body.drop{outline:2px dashed var(--accent);outline-offset:-6px}
+.preview{border:1px solid var(--rule);border-radius:0 0 8px 8px;background:var(--paper);padding:14px 20px;min-height:380px}
+.mentions{margin:12px 0 4px}
+.mentions h3,.ed-side h3{font-size:1rem;margin:0 0 8px}
+.ed-side{background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:16px;position:sticky;top:calc(16px + env(safe-area-inset-top,0px))}
+.ib-pic{border:1px dashed var(--rule);border-radius:8px;min-height:120px;display:grid;place-items:center;background:var(--paper2);overflow:hidden;margin-bottom:8px;color:var(--muted);font-size:.9rem;text-align:center;padding:6px}
+.ib-pic img{max-height:240px;object-fit:contain;display:block}
+.ib-edit{display:grid;grid-template-columns:42% 1fr 30px;gap:6px;margin-bottom:6px}
+.ib-edit input{padding:6px 8px;font-size:.92rem}
+.ib-edit button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.2rem;line-height:1;border-radius:6px}
+.ib-edit button:hover{color:var(--red);background:var(--paper2)}
+.ed-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:22px;max-width:1160px}
+.status{color:var(--muted);font-size:.92rem}
+.err{color:var(--red);font-size:.95rem}
+.help{font-size:.88rem;color:var(--muted);line-height:1.6}
+.help code{background:var(--paper2);padding:1px 5px;border-radius:4px;font-size:.85rem}
+
+/* join */
+.join{max-width:520px}
+.join h1{font-family:var(--serif);font-weight:800;font-size:clamp(2rem,5vw,2.8rem);line-height:1.05;margin:0 0 10px}
+.join p{color:var(--muted)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap;border:0;padding:0;margin:0 0 20px}
+.swatches legend{font-weight:500;margin-bottom:6px;padding:0}
+.swatches label{cursor:pointer}
+.swatches input{position:absolute;opacity:0;pointer-events:none}
+.swatches span{display:block;width:36px;height:36px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px var(--rule)}
+.swatches input:checked+span{border-color:var(--paper);box-shadow:0 0 0 2px var(--ink)}
+.swatches input:focus-visible+span{outline:2px solid var(--accent);outline-offset:3px}
+.notice{padding:14px 16px;border-radius:10px;background:var(--paper);border:1px solid var(--rule);max-width:620px}
+.loading{color:var(--muted);font-family:var(--serif);font-style:italic;font-size:1.2rem;padding:40px 0}
+
+/* hover preview + toast */
+.pop{position:fixed;z-index:60;width:300px;background:var(--paper);border:1px solid var(--rule);border-top:4px solid var(--cc);border-radius:4px 4px 10px 10px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.18);pointer-events:none;opacity:0;transition:opacity .12s}
+.pop.show{opacity:1}
+.pop b{font-family:var(--serif);font-size:1.15rem;display:block;line-height:1.2}
+.pop .k{color:var(--cc);font-size:.82rem;font-weight:700}
+.pop p{margin:6px 0 0;font-size:.92rem;color:var(--muted);line-height:1.4}
+.pop img{width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block}
+.toasts{position:fixed;left:0;right:0;bottom:0;padding:0 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;z-index:80}
+.toast{background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.toast.bad{background:var(--red);color:#fff}
+.scrim{display:none}
+
+@media (max-width:1000px){
+  .art-grid{grid-template-columns:1fr;gap:24px}
+  .infobox{order:-1;max-width:440px;width:100%}
+  .ed-grid{grid-template-columns:1fr}
+  .ed-side{position:static}
+}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(310px,86vw);z-index:50;transform:translateX(-105%);transition:transform .22s ease;padding-top:calc(22px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));box-shadow:none}
+  .shell.open .side{transform:none;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  .shell.open .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:45}
+  .topbar{display:flex;align-items:center;gap:10px;position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--paper2);border-bottom:1px solid var(--rule);padding:8px 12px}
+  .topbar b{font-family:var(--serif);font-size:1.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .main{padding-top:24px}
+  .row2{grid-template-columns:1fr;gap:0}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side" aria-label="Wiki navigation">
+    <div class="brand" id="sideBrand"></div>
+    <div class="search">
+      <input type="search" id="q" placeholder="Search articles" aria-label="Search articles" autocomplete="off">
+    </div>
+    <div class="results" id="results"></div>
+    <nav class="nav" id="sideNav"></nav>
+    <section id="sideBm"></section>
+    <div class="me" id="sideMe"></div>
+  </aside>
+  <div>
+    <header class="topbar">
+      <button class="btn small" id="menuBtn" aria-label="Open navigation">Menu</button>
+      <b id="topTitle">Worldkeeper</b>
+    </header>
+    <main class="main" id="main"><p class="loading">Opening the archive…</p></main>
+  </div>
+</div>
+<div class="pop" id="pop" role="tooltip"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<input type="file" id="filePick" accept="image/*" hidden>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const CATS = [
+  {id:'character', plural:'Characters', one:'Character', fields:['Also known as','Species','Born','Died','Affiliation','Occupation','Status']},
+  {id:'place',     plural:'Places',     one:'Place',     fields:['Type','Region','Population','Ruler','Founded']},
+  {id:'event',     plural:'Events',     one:'Event',     fields:['Date','Location','Participants','Outcome']},
+  {id:'faction',   plural:'Factions',   one:'Faction',   fields:['Leader','Founded','Headquarters','Allegiance']},
+  {id:'item',      plural:'Items',      one:'Item',      fields:['Type','Creator','Current owner','Material']},
+  {id:'creature',  plural:'Creatures',  one:'Creature',  fields:['Classification','Habitat','Diet','Danger']},
+  {id:'lore',      plural:'Lore',       one:'Lore entry',fields:['Domain','Origin','Practitioners']},
+];
+const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
+const SIGILS = ['#2A7565','#4352A0','#A23B3B','#76448A','#8E620E','#4A752A','#3D6E8C'];
+
+/* ---------- state ---------- */
+const S = {
+  mode:'loading', db:null, user:null, uid:null, canWrite:false, isAdmin:false,
+  articles:{}, members:{}, world:{name:'',tagline:''}, bookmarks:[],
+  loaded:false, imgCache:new Map(), editing:null, renamingWorld:false, confirmDelete:false
+};
+
+/* ---------- helpers ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const unesc = s => String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const slug = s => String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,40) || 'section';
+const clone = o => JSON.parse(JSON.stringify(o));
+const LS = {
+  get(k,d){ try{ const v = localStorage.getItem('wk:'+k); return v == null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem('wk:'+k, JSON.stringify(v)); return true; }catch{ return false; } },
+  del(k){ try{ localStorage.removeItem('wk:'+k); }catch{} }
+};
+function ago(t){
+  if(!t) return '';
+  const rtf = new Intl.RelativeTimeFormat(undefined,{numeric:'auto'});
+  const d = (t - Date.now())/1000, a = Math.abs(d);
+  if(a < 60) return 'just now';
+  if(a < 3600) return rtf.format(Math.round(d/60),'minute');
+  if(a < 86400) return rtf.format(Math.round(d/3600),'hour');
+  if(a < 86400*30) return rtf.format(Math.round(d/86400),'day');
+  return new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+}
+function toast(msg, bad){
+  const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg;
+  $('#toasts').append(el); setTimeout(() => el.remove(), 3200);
+}
+function writeError(e){
+  const code = e && e.code;
+  if(code === 'invalid_argument' || code === 'not_granted'){ S.canWrite = false; toast('You have view-only access to this world, so changes can’t be saved.', true); renderSidebar(); }
+  else if(code === 'quota_exceeded') toast('This wiki has reached its storage limit. Delete unused articles or images to make room.', true);
+  else if(code === 'resource_exhausted') toast('Too many changes at once. Wait a moment and try again.', true);
+  else toast((e && e.message) ? e.message : 'The change couldn’t be saved. Try again.', true);
+}
+const me = () => S.members[S.uid] || null;
+const catOf = a => CAT[a && a.category] ? a.category : 'lore';
+const penName = id => (S.members[id] && S.members[id].penName) || (S.mode === 'local' ? 'You' : 'A chronicler');
+const sortedArticles = () => Object.values(S.articles).sort((a,b) => a.title.localeCompare(b.title, undefined, {sensitivity:'base'}));
+
+/* ---------- link index: the auto-hyperlinking engine ---------- */
+const LINK = { re:null, map:new Map() };
+function namesOf(a){ return [a.title, ...(a.aliases || [])].map(s => String(s || '').trim()).filter(s => s.length >= 2); }
+function rebuildIndex(){
+  const map = new Map();
+  // older articles claim a name first, so links stay stable when a duplicate alias appears
+  const list = Object.values(S.articles).sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+  for(const a of list) for(const n of namesOf(a)){ const k = n.toLowerCase(); if(!map.has(k)) map.set(k, a.id); }
+  const names = [...map.keys()].sort((a,b) => b.length - a.length);
+  LINK.map = map;
+  LINK.re = names.length ? new RegExp('(?<![\\p{L}\\p{N}_])(' + names.map(escRe).join('|') + ')(?![\\p{L}\\p{N}_])', 'giu') : null;
+}
+function wikiAnchor(id, text){
+  const a = S.articles[id], el = document.createElement('a');
+  el.className = 'wl c-' + catOf(a); el.href = '#/a/' + id; el.dataset.id = id; el.textContent = text;
+  return el;
+}
+// Walk text nodes and turn every mention of another article's title or alias into a link.
+function autolink(root, excludeId){
+  if(!LINK.re || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(n){
+    if(!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+    for(let p = n.parentElement; p && p !== root; p = p.parentElement){ if(p.matches('a,h1,h2,h3,code,button,.nolink')) return NodeFilter.FILTER_REJECT; }
+    return NodeFilter.FILTER_ACCEPT;
+  }});
+  const nodes = []; while(walker.nextNode()) nodes.push(walker.currentNode);
+  for(const node of nodes){
+    const text = node.nodeValue; let m, last = 0, frag = null;
+    LINK.re.lastIndex = 0;
+    while((m = LINK.re.exec(text))){
+      const id = LINK.map.get(m[1].toLowerCase());
+      if(!id || id === excludeId) continue;
+      frag = frag || document.createDocumentFragment();
+      frag.append(text.slice(last, m.index), wikiAnchor(id, m[1]));
+      last = m.index + m[1].length;
+    }
+    if(frag){ frag.append(text.slice(last)); node.replaceWith(frag); }
+  }
+}
+// Which articles does this text mention? Used for "Mentioned in" and the editor's link list.
+function mentionsIn(text, excludeId){
+  const found = new Set(), missing = new Set();
+  const t = String(text || '');
+  if(LINK.re){ LINK.re.lastIndex = 0; let m; while((m = LINK.re.exec(t))){ const id = LINK.map.get(m[1].toLowerCase()); if(id && id !== excludeId) found.add(id); } }
+  for(const m of t.matchAll(/\[\[([^\]|]+?)(?:\|[^\]]+?)?\]\]/g)){
+    const name = m[1].trim(), id = LINK.map.get(name.toLowerCase());
+    if(id){ if(id !== excludeId) found.add(id); } else if(name) missing.add(name);
+  }
+  return { found:[...found], missing:[...missing] };
+}
+function articleText(a){ return [a.summary, a.body, ...(a.infobox || []).map(r => r.v)].join('\n'); }
+
+/* ---------- tiny markdown renderer ---------- */
+function inline(s){ // s is already HTML-escaped
+  s = s.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, t, l) => {
+    const name = unesc(t).trim(), id = LINK.map.get(name.toLowerCase()), label = l || t;
+    if(id) return `<a class="wl c-${catOf(S.articles[id])}" href="#/a/${id}" data-id="${id}">${label}</a>`;
+    return `<a class="redlink" href="#/new?title=${encodeURIComponent(name)}" title="Not written yet. Select to create it.">${label}</a>`;
+  });
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*\w])\*(?!\s)(.+?)\*(?!\w)/g, '$1<em>$2</em>');
+  return s;
+}
+function validRef(r){ return /^(dbimg|local):[\w.-]+$/.test(r) || /^data:image\//.test(r); }
+function figure(ref, cap){
+  if(!validRef(ref)) return '';
+  return `<figure><img data-ref="${esc(ref)}" alt="${esc(cap)}" loading="lazy">${cap ? `<figcaption>${inline(esc(cap))}</figcaption>` : ''}</figure>`;
+}
+function renderMd(src){
+  const lines = String(src || '').replace(/\r/g,'').split('\n');
+  const out = [], heads = []; let para = [], list = null, quote = [];
+  const flushP = () => { if(para.length){ out.push('<p>' + inline(esc(para.join(' '))) + '</p>'); para = []; } };
+  const flushL = () => { if(list){ out.push(`<${list.t}>` + list.items.map(i => '<li>' + inline(esc(i)) + '</li>').join('') + `</${list.t}>`); list = null; } };
+  const flushQ = () => { if(quote.length){ out.push('<blockquote>' + inline(esc(quote.join(' '))) + '</blockquote>'); quote = []; } };
+  const flush = () => { flushP(); flushL(); flushQ(); };
+  for(const raw of lines){
+    const line = raw.trimEnd(); let m;
+    if(!line.trim()){ flush(); continue; }
+    if((m = line.match(/^(#{1,3})\s+(.+)/))){
+      flush(); const lvl = m[1].length === 3 ? 3 : 2, id = 's-' + heads.length + '-' + slug(m[2]);
+      heads.push({lvl, text:m[2], id}); out.push(`<h${lvl} id="${id}">${inline(esc(m[2]))}</h${lvl}>`); continue;
+    }
+    if(/^(-{3,}|\*{3,})$/.test(line.trim())){ flush(); out.push('<hr>'); continue; }
+    if((m = line.match(/^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/))){ flush(); out.push(figure(m[2], m[1])); continue; }
+    if((m = line.match(/^\s*[-*]\s+(.*)/))){ flushP(); flushQ(); if(!list || list.t !== 'ul'){ flushL(); list = {t:'ul', items:[]}; } list.items.push(m[1]); continue; }
+    if((m = line.match(/^\s*\d+[.)]\s+(.*)/))){ flushP(); flushQ(); if(!list || list.t !== 'ol'){ flushL(); list = {t:'ol', items:[]}; } list.items.push(m[1]); continue; }
+    if((m = line.match(/^>\s?(.*)/))){ flushP(); flushL(); quote.push(m[1]); continue; }
+    flushL(); flushQ(); para.push(line.trim());
+  }
+  flush();
+  return { html: out.join(''), heads };
+}
+
+/* ---------- images ---------- */
+function loadImg(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { res(img); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('That file couldn’t be read as an image. Try a JPG or PNG.')); };
+    img.src = url;
+  });
+}
+async function shrink(img, max, q){
+  const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', q);
+}
+async function uploadImage(file){
+  if(!file || !/^image\//.test(file.type)) throw new Error('Choose an image file (JPG, PNG, WebP or GIF).');
+  const img = await loadImg(file);
+  let data = await shrink(img, 1100, .82);
+  if(data.length > 220000) data = await shrink(img, 820, .72);
+  if(data.length > 220000) data = await shrink(img, 600, .62);
+  const id = newId('i');
+  if(S.mode === 'cloud'){
+    await S.db.doc('images/' + id).set({ data, by:S.uid, at:Date.now() });
+    S.imgCache.set('dbimg:' + id, data); return 'dbimg:' + id;
+  }
+  if(!LS.set('img:' + id, data)) throw new Error('This browser is out of space for images. Remove some images or use a smaller picture.');
+  S.imgCache.set('local:' + id, data); return 'local:' + id;
+}
+async function resolveImage(ref){
+  if(!ref || !validRef(ref)) return null;
+  if(ref.startsWith('data:image/')) return ref;
+  if(S.imgCache.has(ref)) return S.imgCache.get(ref);
+  let url = null;
+  if(ref.startsWith('local:')) url = LS.get('img:' + ref.slice(6), null);
+  else if(ref.startsWith('dbimg:') && S.db){ try{ const d = await S.db.doc('images/' + ref.slice(6)).get(); url = d.exists ? d.data().data : null; }catch{} }
+  if(url) S.imgCache.set(ref, url);
+  return url;
+}
+function hydrateImages(root){
+  root.querySelectorAll('img[data-ref]').forEach(async img => {
+    const url = await resolveImage(img.dataset.ref);
+    if(url) img.src = url; else { const f = img.closest('figure'); if(f) f.classList.add('missing'); else img.remove(); }
+  });
+}
+function pickFile(){
+  return new Promise(res => {
+    const inp = $('#filePick'); inp.value = '';
+    inp.onchange = () => res(inp.files && inp.files[0] || null);
+    inp.click();
+  });
+}
+
+/* ---------- data layer (cloud db when available, browser storage otherwise) ---------- */
+const API = {
+  async saveArticle(id, a){
+    if(S.mode === 'cloud') await S.db.doc('articles/' + id).set(a);
+    else { S.articles[id] = {id, ...a}; if(!LS.set('articles', stripIds(S.articles))) throw new Error('This browser is out of storage space.'); onData(); }
+  },
+  async deleteArticle(id){
+    const a = S.articles[id];
+    if(S.mode === 'cloud') await S.db.doc('articles/' + id).delete();
+    else { delete S.articles[id]; LS.set('articles', stripIds(S.articles)); onData(); }
+    // remove images that only this article used
+    for(const ref of imageRefs(a)){
+      const stillUsed = Object.values(S.articles).some(o => o.id !== id && imageRefs(o).includes(ref));
+      if(stillUsed) continue;
+      try{ if(ref.startsWith('dbimg:') && S.mode === 'cloud') await S.db.doc('images/' + ref.slice(6)).delete(); if(ref.startsWith('local:')) LS.del('img:' + ref.slice(6)); }catch{}
+    }
+  },
+  async saveMember(m){
+    if(S.mode === 'cloud') await S.db.doc('members/' + S.uid).set(m);
+    else { S.members.local = m; LS.set('profile', m); onData(); }
+  },
+  async setBookmarks(ids){
+    if(S.mode === 'cloud') await S.db.doc('data/users/' + S.uid + '/bookmarks').set({ ids });
+    else { S.bookmarks = ids; LS.set('bookmarks', ids); onData(); }
+  },
+  async saveWorld(w){
+    if(S.mode === 'cloud') await S.db.doc('settings/world').set(w);
+    else { S.world = w; LS.set('world', w); onData(); }
+  }
+};
+function stripIds(map){ const o = {}; for(const [k,v] of Object.entries(map)){ const {id, ...rest} = v; o[k] = rest; } return o; }
+function imageRefs(a){
+  if(!a) return [];
+  const refs = new Set(); if(a.image) refs.add(a.image);
+  for(const m of String(a.body || '').matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) refs.add(m[1]);
+  return [...refs];
+}
+
+async function getCap(name){
+  const C = window.claude;
+  if(!C || typeof C.use !== 'function') return null;
+  try{ return await Promise.race([C.use(name), new Promise(r => setTimeout(() => r(null), 9000))]); }catch{ return null; }
+}
+
+async function init(){
+  const [db, user] = await Promise.all([getCap('db'), getCap('user')]);
+  if(db){
+    S.mode = 'cloud'; S.db = db; S.user = user;
+    try{ S.uid = user ? await user.id() : null; }catch{ S.uid = null; }
+    try{ const w = user ? await user.can('data.write') : null; S.canWrite = !!S.uid && w !== false; }catch{ S.canWrite = !!S.uid; }
+    try{ S.isAdmin = user ? !!(await user.canEdit()) : false; }catch{ S.isAdmin = false; }
+    const onErr = e => { if(e && e.code === 'revoked'){ S.canWrite = false; renderSidebar(); } };
+    db.collection('articles').limit(1000).onSnapshot(snap => {
+      const m = {}; snap.docs.forEach(d => { if(d.exists) m[d.id] = { id:d.id, ...clone(d.data()) }; });
+      S.articles = m; S.loaded = true; onData();
+    }, e => { onErr(e); S.loaded = true; onData(); });
+    db.collection('members').limit(1000).onSnapshot(snap => {
+      const m = {}; snap.docs.forEach(d => { if(d.exists) m[d.id] = clone(d.data()); }); S.members = m; onData();
+    }, onErr);
+    db.doc('settings/world').onSnapshot(d => { S.world = d.exists ? clone(d.data()) : {name:'',tagline:''}; onData(); }, onErr);
+    if(S.uid) db.doc('data/users/' + S.uid + '/bookmarks').onSnapshot(d => { S.bookmarks = d.exists ? [...(d.data().ids || [])] : []; onData(); }, onErr);
+  } else {
+    S.mode = 'local'; S.uid = 'local'; S.canWrite = true; S.isAdmin = true;
+    const stored = LS.get('articles', {}); for(const [k,v] of Object.entries(stored)) S.articles[k] = {id:k, ...v};
+    const p = LS.get('profile', null); if(p) S.members.local = p;
+    S.world = LS.get('world', {name:'',tagline:''}); S.bookmarks = LS.get('bookmarks', []);
+    S.loaded = true; onData();
+  }
+}
+let dataTimer = null;
+function onData(){
+  clearTimeout(dataTimer);
+  dataTimer = setTimeout(() => {
+    rebuildIndex(); renderSidebar();
+    if(!S.editing) renderMain(); else updateMentions();
+  }, 30);
+}
+
+/* ---------- permissions gate ---------- */
+function gate(next){
+  if(S.mode === 'cloud' && !S.canWrite){ toast(S.uid ? 'You have view-only access to this world.' : 'Sign in to claude.ai to write and bookmark articles.', true); return false; }
+  if(!me()){ location.hash = '#/join?next=' + encodeURIComponent(next || location.hash); return false; }
+  return true;
+}
+
+/* ---------- sidebar ---------- */
+function renderSidebar(){
+  const w = S.world.name || 'Untitled world';
+  $('#sideBrand').innerHTML = `<a href="#/">${esc(w)}</a><small>Worldkeeper wiki</small>`;
+  $('#topTitle').textContent = w;
+  const route = parseHash(), counts = {};
+  for(const a of Object.values(S.articles)) counts[catOf(a)] = (counts[catOf(a)] || 0) + 1;
+  $('#sideNav').innerHTML =
+    `<a class="navlink ${route.view === 'home' ? 'on' : ''}" href="#/"><span class="dot" style="background:var(--accent)"></span>Overview<span class="count">${Object.keys(S.articles).length}</span></a>` +
+    CATS.map(c => `<a class="navlink c-${c.id} ${route.view === 'cat' && route.arg === c.id ? 'on' : ''}" href="#/c/${c.id}"><span class="dot"></span>${c.plural}<span class="count">${counts[c.id] || 0}</span></a>`).join('') +
+    `<div style="padding:10px 4px 0"><a class="btn primary" style="width:100%" href="#/new">Write an article</a></div>`;
+  const bm = S.bookmarks.map(id => S.articles[id]).filter(Boolean);
+  $('#sideBm').innerHTML = `<h2>Bookmarks</h2>` + (bm.length
+    ? `<div class="nav">${bm.map(a => `<a class="navlink c-${catOf(a)} ${route.view === 'article' && route.arg === a.id ? 'on' : ''}" href="#/a/${a.id}"><span class="dot"></span>${esc(a.title)}</a>`).join('')}</div>`
+    : `<p class="empty">${me() ? 'Bookmark an article to keep it here.' : 'Create a profile to save bookmarks.'}</p>`);
+  const p = me();
+  let meHtml = '';
+  if(p) meHtml = `<a class="me-row" href="#/join"><span class="sigil" style="background:${esc(p.sigil || SIGILS[0])}">${esc((p.penName || '?').trim().charAt(0).toUpperCase())}</span><span><b>${esc(p.penName)}</b><small>Edit profile</small></span></a>`;
+  else if(S.mode === 'local' || S.canWrite) meHtml = `<a class="btn" href="#/join">Create your profile</a>`;
+  else meHtml = `<p class="modenote">${S.uid ? 'You can read this world. Ask its owner for Contributor access to write.' : 'Sign in to claude.ai to create a profile and write articles.'}</p>`;
+  if(S.mode === 'local') meHtml += `<p class="modenote">Saved in this browser only. Open the published link to share the wiki and sync across devices.</p>`;
+  $('#sideMe').innerHTML = meHtml;
+}
+
+/* search */
+function runSearch(){
+  const q = $('#q').value.trim().toLowerCase(), box = $('#results');
+  if(!q){ box.innerHTML = ''; $('#sideNav').hidden = false; return; }
+  $('#sideNav').hidden = true;
+  const hits = sortedArticles().map(a => {
+    const t = a.title.toLowerCase(); let score = 0;
+    if(t === q) score = 100; else if(t.startsWith(q)) score = 60; else if(t.includes(q)) score = 40;
+    else if((a.aliases || []).some(x => x.toLowerCase().includes(q))) score = 30;
+    else if((a.summary || '').toLowerCase().includes(q)) score = 15;
+    else if((a.body || '').toLowerCase().includes(q)) score = 5;
+    return {a, score};
+  }).filter(h => h.score).sort((x,y) => y.score - x.score).slice(0, 12);
+  const exact = hits.some(h => h.a.title.toLowerCase() === q);
+  box.innerHTML = hits.map(h => `<a class="navlink c-${catOf(h.a)}" href="#/a/${h.a.id}"><span class="dot"></span>${esc(h.a.title)}</a>`).join('') +
+    (exact ? '' : `<a class="navlink" href="#/new?title=${encodeURIComponent($('#q').value.trim())}"><span class="dot" style="background:var(--red)"></span>Create “${esc($('#q').value.trim())}”</a>`) +
+    (hits.length ? '' : `<p class="empty">No articles match.</p>`);
+}
+
+/* ---------- routing ---------- */
+function parseHash(){
+  const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/').filter(Boolean);
+  const params = new URLSearchParams(qs || '');
+  if(!parts.length) return {view:'home', params};
+  const map = {c:'cat', a:'article', edit:'edit', new:'new', join:'join'};
+  return { view: map[parts[0]] || 'home', arg: parts[1] ? decodeURIComponent(parts[1]) : null, params };
+}
+window.addEventListener('hashchange', () => {
+  S.editing = null; S.renamingWorld = false; S.confirmDelete = false;
+  $('#shell').classList.remove('open'); $('#q').value = ''; runSearch(); hidePop();
+  renderSidebar(); renderMain(); window.scrollTo(0, 0);
+});
+
+function renderMain(){
+  const main = $('#main');
+  if(!S.loaded){ main.innerHTML = '<p class="loading">Opening the archive…</p>'; return; }
+  const r = parseHash();
+  if(r.view === 'cat') return viewCategory(main, r.arg);
+  if(r.view === 'article') return viewArticle(main, r.arg);
+  if(r.view === 'edit') return viewEditor(main, r.arg, r.params);
+  if(r.view === 'new') return viewEditor(main, null, r.params);
+  if(r.view === 'join') return viewJoin(main, r.params);
+  return viewHome(main);
+}
+
+/* ---------- home ---------- */
+function viewHome(main){
+  const all = sortedArticles(), n = all.length;
+  const name = S.world.name || 'Untitled world';
+  const catsUsed = new Set(all.map(catOf)).size;
+  let html = `<header class="hero">
+    <h1 class="world-title">${esc(name)}</h1>
+    <p class="tagline">${esc(S.world.tagline || (n ? 'A living record of this world.' : 'Every world starts with a single name.'))}</p>
+    <div class="row">
+      <span class="stat">${n} ${n === 1 ? 'article' : 'articles'}${n ? ` across ${catsUsed} ${catsUsed === 1 ? 'category' : 'categories'}` : ''}</span>
+      <a class="btn primary" href="#/new">Write an article</a>
+      ${S.isAdmin ? `<button class="btn" id="renameBtn">${S.world.name ? 'Rename world' : 'Name this world'}</button>` : ''}
+    </div>
+    ${S.renamingWorld ? `<div class="inline-form">
+      <label class="f" style="margin:0">World name<input id="w-name" maxlength="60" value="${esc(S.world.name)}" placeholder="e.g. The Shattered Reach"></label>
+      <label class="f" style="margin:0">Tagline<input id="w-tag" maxlength="120" value="${esc(S.world.tagline)}" placeholder="One line that sets the tone"></label>
+      <div class="row"><button class="btn primary" id="w-save">Save world name</button><button class="btn ghost" id="w-cancel">Cancel</button></div>
+    </div>` : ''}
+    ${n ? '' : `<p class="demo">Write about <a class="wl c-character" href="#/new?cat=character&title=Queen%20Ysolde">Queen Ysolde</a> and later mention her in an article about <a class="wl c-place" href="#/new?cat=place&title=Harrowmere">Harrowmere</a>: her name turns into a link by itself, colored by its category. Type <b>[[Name]]</b> to point at a page you haven’t written yet.</p>`}
+  </header>`;
+  html += `<section class="index">` + CATS.map(c => {
+    const list = all.filter(a => catOf(a) === c.id);
+    return `<div class="cat-block c-${c.id}"><h2><a href="#/c/${c.id}">${c.plural}</a><span>${list.length}</span></h2>` +
+      (list.length ? `<ul>${list.slice(0,6).map(a => `<li><a href="#/a/${a.id}">${esc(a.title)}</a></li>`).join('')}</ul>${list.length > 6 ? `<a class="more" href="#/c/${c.id}">All ${list.length} ${c.plural.toLowerCase()}</a>` : ''}`
+        : `<p>None yet. <a href="#/new?cat=${c.id}">Add the first ${c.one.toLowerCase()}</a></p>`) + `</div>`;
+  }).join('') + `</section>`;
+  const recent = Object.values(S.articles).sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0)).slice(0, 8);
+  if(recent.length) html += `<section class="recent"><h2 class="sec-title">Recently changed</h2><ol>${recent.map(a =>
+    `<li class="c-${catOf(a)}"><a href="#/a/${a.id}">${esc(a.title)}</a><span class="tag">${CAT[catOf(a)].one}</span><time>${esc(ago(a.updatedAt))}${S.mode === 'cloud' ? ' by ' + esc(penName(a.editorId)) : ''}</time></li>`).join('')}</ol></section>`;
+  main.innerHTML = html;
+  const rb = $('#renameBtn'); if(rb) rb.onclick = () => { S.renamingWorld = true; renderMain(); $('#w-name').focus(); };
+  const ws = $('#w-save'); if(ws) ws.onclick = async () => {
+    try{ await API.saveWorld({ name: $('#w-name').value.trim(), tagline: $('#w-tag').value.trim() }); S.renamingWorld = false; toast('World name saved'); renderMain(); }catch(e){ writeError(e); }
+  };
+  const wc = $('#w-cancel'); if(wc) wc.onclick = () => { S.renamingWorld = false; renderMain(); };
+}
+
+/* ---------- category ---------- */
+function viewCategory(main, id){
+  const c = CAT[id]; if(!c) return viewHome(main);
+  const list = sortedArticles().filter(a => catOf(a) === id);
+  let html = `<div class="c-${id}"><div class="page-head"><h1>${c.plural}</h1><a class="btn primary" href="#/new?cat=${id}">New ${c.one.toLowerCase()}</a></div>`;
+  if(!list.length) html += `<div class="notice">No ${c.plural.toLowerCase()} yet. <a href="#/new?cat=${id}" style="color:var(--cc)">Write the first one</a>.</div>`;
+  let letter = '';
+  const groups = [];
+  for(const a of list){ const L = (a.title.trim()[0] || '#').toUpperCase(); if(L !== letter){ letter = L; groups.push({L, items:[]}); } groups[groups.length-1].items.push(a); }
+  html += groups.map(g => `<h2 class="letter">${esc(g.L)}</h2><div class="alist">${g.items.map(a =>
+    `<a class="acard" href="#/a/${a.id}"><span class="thumb">${a.image ? `<img data-ref="${esc(a.image)}" alt="">` : esc(a.title.trim()[0] || '?')}</span><span><b>${esc(a.title)}</b><span>${esc(a.summary || 'No summary yet.')}</span></span></a>`).join('')}</div>`).join('');
+  main.innerHTML = html + '</div>';
+  hydrateImages(main);
+}
+
+/* ---------- article ---------- */
+function viewArticle(main, id){
+  const a = S.articles[id];
+  if(!a){ main.innerHTML = `<div class="notice">This article doesn’t exist. It may have been deleted or renamed. <a href="#/">Back to the overview</a></div>`; return; }
+  const cat = catOf(a), c = CAT[cat], md = renderMd(a.body);
+  const marked = S.bookmarks.includes(id);
+  const canDelete = S.mode === 'local' || (S.canWrite && (a.authorId === S.uid || S.isAdmin));
+  const toc = md.heads.length >= 3 ? `<nav class="toc nolink" aria-label="Contents"><b>Contents</b><ol>${md.heads.map(h => `<li class="${h.lvl === 3 ? 'sub' : ''}"><a href="#${h.id}" data-jump="${h.id}">${esc(h.text)}</a></li>`).join('')}</ol></nav>` : '';
+  const rows = (a.infobox || []).filter(r => r.k && r.v);
+  const backs = Object.values(S.articles).filter(o => o.id !== id && mentionsIn(articleText(o)).found.includes(id))
+    .sort((x,y) => x.title.localeCompare(y.title));
+  main.innerHTML = `<article class="article c-${cat}">
+    <div class="crumbs"><a href="#/c/${cat}">${c.plural}</a></div>
+    <div class="art-head"><h1>${esc(a.title)}</h1><div class="actions">
+      <button class="btn small mark ${marked ? 'on' : ''}" id="bmBtn" aria-pressed="${marked}">${marked ? '★ Bookmarked' : '☆ Bookmark'}</button>
+      <a class="btn small" href="#/edit/${id}">Edit</a></div></div>
+    ${(a.aliases || []).length ? `<p class="aka">Also known as ${a.aliases.map(x => `<i>${esc(x)}</i>`).join(', ')}</p>` : ''}
+    <div class="art-grid">
+      <div class="prose" id="body">${a.summary ? `<p class="lead">${esc(a.summary)}</p>` : ''}${toc}${md.html || (a.summary ? '' : `<p style="color:var(--muted)">This article is empty. <a href="#/edit/${id}">Start writing it</a>.</p>`)}</div>
+      <aside class="infobox" id="ib">
+        <div class="ib-title">${esc(a.title)}</div>
+        ${a.image ? `<figure class="ib-img" style="margin:0"><img data-ref="${esc(a.image)}" alt="${esc(a.imageCaption || a.title)}">${a.imageCaption ? `<figcaption>${esc(a.imageCaption)}</figcaption>` : ''}</figure>` : ''}
+        <div class="ib-type">${c.one}</div>
+        ${rows.length ? `<dl>${rows.map(r => `<div class="ib-row"><dt>${esc(r.k)}</dt><dd>${inline(esc(r.v))}</dd></div>`).join('')}</dl>` : ''}
+      </aside>
+    </div>
+    <section class="backlinks"><h2>Mentioned in</h2>${backs.length
+      ? `<div class="chips">${backs.map(o => `<a class="chip c-${catOf(o)}" href="#/a/${o.id}">${esc(o.title)}</a>`).join('')}</div>`
+      : `<p style="color:var(--muted);margin:0">No other article mentions ${esc(a.title)} yet. Write its name in another article and it links here.</p>`}</section>
+    <footer class="foot-meta"><span>${S.mode === 'cloud' ? `Created by ${esc(penName(a.authorId))}. ` : ''}Last edited ${esc(ago(a.updatedAt))}${S.mode === 'cloud' ? ' by ' + esc(penName(a.editorId)) : ''}.</span>
+      ${canDelete ? (S.confirmDelete
+        ? `<span><button class="btn small danger" id="delYes">Delete “${esc(a.title)}” for good</button> <button class="btn small ghost" id="delNo">Keep it</button></span>`
+        : `<button class="btn small ghost danger" id="delBtn">Delete article</button>`) : ''}
+    </footer></article>`;
+  autolink($('#body'), id); autolink($('#ib dl'), id);
+  hydrateImages(main);
+  main.querySelectorAll('[data-jump]').forEach(l => l.onclick = e => { e.preventDefault(); const t = document.getElementById(l.dataset.jump); if(t) t.scrollIntoView({behavior:'smooth'}); });
+  $('#bmBtn').onclick = async () => {
+    if(!gate('#/a/' + id)) return;
+    const ids = S.bookmarks.includes(id) ? S.bookmarks.filter(x => x !== id) : [...S.bookmarks, id];
+    try{ await API.setBookmarks(ids); toast(ids.includes(id) ? 'Bookmarked' : 'Bookmark removed'); }catch(e){ writeError(e); }
+  };
+  const db = $('#delBtn'); if(db) db.onclick = () => { S.confirmDelete = true; viewArticle(main, id); };
+  const dn = $('#delNo'); if(dn) dn.onclick = () => { S.confirmDelete = false; viewArticle(main, id); };
+  const dy = $('#delYes'); if(dy) dy.onclick = async () => {
+    dy.disabled = true;
+    try{
+      await API.deleteArticle(id);
+      if(S.bookmarks.includes(id)) API.setBookmarks(S.bookmarks.filter(x => x !== id)).catch(() => {});
+      toast('Article deleted'); location.hash = '#/c/' + cat;
+    }catch(e){ dy.disabled = false; writeError(e); }
+  };
+}
+
+/* ---------- editor ---------- */
+function viewEditor(main, id, params){
+  if(!S.editing){
+    if(!gate(location.hash)) { if(!location.hash.startsWith('#/join')) main.innerHTML = `<div class="notice">You can read this world, but writing needs Contributor access and a profile.</div>`; return; }
+    if(id){
+      const a = S.articles[id];
+      if(!a){ main.innerHTML = `<div class="notice">This article doesn’t exist anymore. <a href="#/">Back to the overview</a></div>`; return; }
+      S.editing = { id, isNew:false, orig:a, draft: clone({ title:a.title, category:catOf(a), aliases:a.aliases || [], summary:a.summary || '', body:a.body || '', infobox:a.infobox || [], image:a.image || '', imageCaption:a.imageCaption || '' }) };
+    } else {
+      const cat = CAT[params.get('cat')] ? params.get('cat') : 'character';
+      S.editing = { id:newId('a'), isNew:true, orig:null, draft:{ title:params.get('title') || '', category:cat, aliases:[], summary:'', body:'', infobox:CAT[cat].fields.map(k => ({k, v:''})), image:'', imageCaption:'' } };
+    }
+    S.editing.preview = false;
+  }
+  const E = S.editing, d = E.draft;
+  main.innerHTML = `<div class="editor c-${d.category}" id="ed">
+    <h1>${E.isNew ? 'New article' : 'Editing ' + esc(E.orig.title)}</h1>
+    <div class="ed-grid">
+      <div>
+        <label class="f">Title<input id="f-title" maxlength="100" value="${esc(d.title)}" placeholder="e.g. Queen Ysolde" required></label>
+        <div class="row2">
+          <label class="f">Category<select id="f-cat">${CATS.map(c => `<option value="${c.id}" ${c.id === d.category ? 'selected' : ''}>${c.one}</option>`).join('')}</select></label>
+          <label class="f">Other names<input id="f-alias" value="${esc(d.aliases.join(', '))}" placeholder="The Ash Queen, Ysolde"><small>Separate with commas. Mentions of these names link here too.</small></label>
+        </div>
+        <label class="f">Summary<input id="f-sum" maxlength="240" value="${esc(d.summary)}" placeholder="One sentence shown at the top and in link previews"></label>
+        <div class="toolbar" role="toolbar" aria-label="Formatting">
+          <button class="btn small" data-fmt="h2" type="button">Heading</button>
+          <button class="btn small" data-fmt="b" type="button"><b>Bold</b></button>
+          <button class="btn small" data-fmt="i" type="button"><i>Italic</i></button>
+          <button class="btn small" data-fmt="ul" type="button">List</button>
+          <button class="btn small" data-fmt="link" type="button">[[Link]]</button>
+          <button class="btn small" id="insImg" type="button">Insert image</button>
+          <span class="sp"></span>
+          <button class="btn small" id="prevBtn" type="button" aria-pressed="${E.preview}">${E.preview ? 'Back to writing' : 'Preview'}</button>
+        </div>
+        <textarea id="f-body" ${E.preview ? 'hidden' : ''} placeholder="Write the article. Names of other articles become links when you save.">${esc(d.body)}</textarea>
+        <div class="preview prose" id="preview" ${E.preview ? '' : 'hidden'}></div>
+        <div class="mentions" id="mentions"></div>
+        <p class="help">Formatting: <code>## Heading</code>, <code>**bold**</code>, <code>*italic*</code>, <code>- list item</code>, <code>&gt; quote</code>. Any title or other name of an existing article links automatically. Use <code>[[Name]]</code> to link a page that doesn’t exist yet. Drop an image onto the text box to insert it.</p>
+      </div>
+      <aside class="ed-side">
+        <h3>Infobox</h3>
+        <div class="ib-pic" id="ibPic"></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn small" id="ibUp" type="button">${d.image ? 'Replace image' : 'Upload image'}</button>${d.image ? '<button class="btn small ghost danger" id="ibRm" type="button">Remove</button>' : ''}</div>
+        ${d.image ? `<label class="f" style="font-size:.9rem">Caption<input id="f-cap" maxlength="140" value="${esc(d.imageCaption)}"></label>` : ''}
+        <div id="ibRows"></div>
+        <button class="btn small" id="ibAdd" type="button">Add field</button>
+      </aside>
+    </div>
+    <div class="ed-actions"><button class="btn primary" id="saveBtn" type="button">Save article</button>
+      <a class="btn ghost" href="${E.isNew ? '#/' : '#/a/' + E.id}">Cancel</a><span class="status" id="edStatus"></span></div>
+  </div>`;
+
+  const body = $('#f-body');
+  $('#f-title').oninput = e => { d.title = e.target.value; updateMentions(); };
+  $('#f-alias').oninput = e => { d.aliases = e.target.value.split(',').map(s => s.trim()).filter(Boolean); };
+  $('#f-sum').oninput = e => { d.summary = e.target.value; };
+  $('#f-cat').onchange = e => {
+    const empty = d.infobox.every(r => !r.v.trim());
+    d.category = e.target.value; if(empty) d.infobox = CAT[d.category].fields.map(k => ({k, v:''}));
+    renderMain();
+  };
+  let mt; body.oninput = () => { d.body = body.value; clearTimeout(mt); mt = setTimeout(updateMentions, 250); };
+  main.querySelectorAll('[data-fmt]').forEach(b => b.onclick = () => format(b.dataset.fmt));
+  $('#prevBtn').onclick = () => { E.preview = !E.preview; renderMain(); };
+  $('#insImg').onclick = async () => { const f = await pickFile(); if(f) insertImage(f); };
+  body.addEventListener('dragover', e => { if([...e.dataTransfer.items].some(i => i.kind === 'file')){ e.preventDefault(); body.classList.add('drop'); } });
+  body.addEventListener('dragleave', () => body.classList.remove('drop'));
+  body.addEventListener('drop', e => { body.classList.remove('drop'); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(f && /^image\//.test(f.type)){ e.preventDefault(); insertImage(f); } });
+
+  // infobox image
+  const pic = $('#ibPic');
+  if(d.image){ pic.innerHTML = `<img data-ref="${esc(d.image)}" alt="">`; hydrateImages(pic); } else pic.textContent = 'No image yet';
+  $('#ibUp').onclick = async () => {
+    const f = await pickFile(); if(!f) return;
+    setStatus('Uploading image…');
+    try{ d.image = await uploadImage(f); setStatus(''); renderMain(); }catch(e){ setStatus(''); writeError(e); }
+  };
+  const rm = $('#ibRm'); if(rm) rm.onclick = () => { d.image = ''; d.imageCaption = ''; renderMain(); };
+  const cap = $('#f-cap'); if(cap) cap.oninput = e => { d.imageCaption = e.target.value; };
+  renderIbRows();
+  $('#ibAdd').onclick = () => { d.infobox.push({k:'', v:''}); renderIbRows(); const ins = $('#ibRows').querySelectorAll('.ib-edit input'); ins[ins.length-2].focus(); };
+  $('#saveBtn').onclick = saveArticle;
+  if(E.preview) renderPreview();
+  updateMentions();
+  if(!d.title) $('#f-title').focus();
+}
+function renderIbRows(){
+  const d = S.editing.draft, box = $('#ibRows');
+  box.innerHTML = d.infobox.map((r, i) => `<div class="ib-edit"><input data-i="${i}" data-f="k" value="${esc(r.k)}" placeholder="Field" aria-label="Field name"><input data-i="${i}" data-f="v" value="${esc(r.v)}" placeholder="Value" aria-label="${esc(r.k || 'Field')} value"><button type="button" data-rm="${i}" aria-label="Remove field">×</button></div>`).join('');
+  box.querySelectorAll('input').forEach(inp => inp.oninput = () => { d.infobox[+inp.dataset.i][inp.dataset.f] = inp.value; });
+  box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { d.infobox.splice(+b.dataset.rm, 1); renderIbRows(); });
+}
+function setStatus(t){ const s = $('#edStatus'); if(s) s.textContent = t; }
+function renderPreview(){
+  const d = S.editing.draft, p = $('#preview'); if(!p) return;
+  p.innerHTML = (d.summary ? `<p class="lead">${esc(d.summary)}</p>` : '') + (renderMd(d.body).html || '<p style="color:var(--muted)">Nothing to preview yet.</p>');
+  autolink(p, S.editing.id); hydrateImages(p);
+}
+function updateMentions(){
+  const E = S.editing, box = $('#mentions'); if(!E || !box) return;
+  const d = E.draft, m = mentionsIn([d.summary, d.body, ...d.infobox.map(r => r.v)].join('\n'), E.id);
+  if(!m.found.length && !m.missing.length){ box.innerHTML = `<p class="hint" style="margin:0">Links will appear here as you mention other articles.</p>`; return; }
+  box.innerHTML = `<h3>Links in this article</h3><div class="chips">` +
+    m.found.map(id => S.articles[id]).filter(Boolean).map(a => `<a class="chip c-${catOf(a)}" href="#/a/${a.id}" target="_blank" title="Opens the article">${esc(a.title)}</a>`).join('') +
+    m.missing.map(n => `<span class="chip red" title="Not written yet">${esc(n)}</span>`).join('') + `</div>`;
+}
+function format(kind){
+  const t = $('#f-body'); if(!t || t.hidden) return;
+  const s = t.selectionStart, e = t.selectionEnd, sel = t.value.slice(s, e);
+  let before = '', after = '', fill = sel;
+  if(kind === 'b'){ before = '**'; after = '**'; fill = sel || 'bold text'; }
+  if(kind === 'i'){ before = '*'; after = '*'; fill = sel || 'italic text'; }
+  if(kind === 'link'){ before = '[['; after = ']]'; fill = sel || 'Article name'; }
+  if(kind === 'h2'){ before = (s && t.value[s-1] !== '\n' ? '\n\n' : '') + '## '; fill = sel || 'Heading'; after = '\n'; }
+  if(kind === 'ul'){ before = (s && t.value[s-1] !== '\n' ? '\n' : '') + '- '; fill = sel || 'List item'; }
+  t.setRangeText(before + fill + after, s, e, 'end');
+  t.selectionStart = s + before.length; t.selectionEnd = s + before.length + fill.length; t.focus();
+  t.dispatchEvent(new Event('input'));
+}
+async function insertImage(file){
+  const t = $('#f-body'); setStatus('Uploading image…');
+  try{
+    const ref = await uploadImage(file);
+    const pos = t ? t.selectionEnd : S.editing.draft.body.length;
+    const snippet = `\n\n![Caption](${ref})\n\n`;
+    const b = S.editing.draft.body; S.editing.draft.body = b.slice(0, pos) + snippet + b.slice(pos);
+    if(t){ t.value = S.editing.draft.body; t.focus(); const cs = pos + 4; t.setSelectionRange(cs, cs + 7); }
+    if(S.editing.preview) renderPreview();
+    setStatus('Image inserted. Replace “Caption” with your own text.');
+  }catch(e){ setStatus(''); writeError(e); }
+}
+async function saveArticle(){
+  const E = S.editing; if(!E) return; const d = E.draft;
+  const title = d.title.trim();
+  if(!title){ setStatus(''); toast('Give the article a title first.', true); $('#f-title') && $('#f-title').focus(); return; }
+  const clash = Object.values(S.articles).find(o => o.id !== E.id && namesOf(o).some(n => n.toLowerCase() === title.toLowerCase()));
+  if(clash){ toast(`“${clash.title}” already uses that name. Choose a different title.`, true); return; }
+  const now = Date.now();
+  const a = {
+    title, category:d.category,
+    aliases:[...new Set(d.aliases.map(s => s.trim()).filter(s => s && s.toLowerCase() !== title.toLowerCase()))].slice(0, 20),
+    summary:d.summary.trim(), body:d.body,
+    infobox:d.infobox.map(r => ({k:r.k.trim(), v:r.v.trim()})).filter(r => r.k && r.v),
+    image:d.image || '', imageCaption:(d.imageCaption || '').trim(),
+    authorId: E.isNew ? S.uid : (E.orig.authorId || S.uid), createdAt: E.isNew ? now : (E.orig.createdAt || now),
+    editorId:S.uid, updatedAt:now
+  };
+  const btn = $('#saveBtn'); btn.disabled = true; setStatus('Saving…');
+  try{
+    await API.saveArticle(E.id, a);
+    const id = E.id; S.editing = null; toast('Article saved');
+    if(S.mode === 'cloud') S.articles[id] = {id, ...a}; // show immediately; the live snapshot follows
+    location.hash = '#/a/' + id;
+  }catch(e){ btn.disabled = false; setStatus(''); writeError(e); }
+}
+
+/* ---------- profile / account creation ---------- */
+function viewJoin(main, params){
+  const p = me(), next = params.get('next') || '#/';
+  if(S.mode === 'cloud' && !S.uid){ main.innerHTML = `<div class="join"><h1>Sign in to join</h1><p>Sign in to claude.ai, then open this wiki again to create your chronicler profile. You can still read every article.</p></div>`; return; }
+  if(S.mode === 'cloud' && !S.canWrite){ main.innerHTML = `<div class="join"><h1>Read-only access</h1><p>You can read this world, but writing and bookmarks need Contributor access. Ask the wiki’s owner to change your access in the Share menu.</p></div>`; return; }
+  const sig = (p && p.sigil) || SIGILS[0];
+  main.innerHTML = `<div class="join">
+    <h1>${p ? 'Your profile' : 'Create your chronicler profile'}</h1>
+    <p>${S.mode === 'cloud' ? 'Your pen name appears on the articles you write and edit, and everyone who can open this wiki can see it. Your bookmarks stay private to you.' : 'Your profile, articles and bookmarks are saved in this browser.'}</p>
+    <label class="f">Pen name<input id="p-name" maxlength="40" value="${esc(p ? p.penName : '')}" placeholder="e.g. Archivist Mara" autocomplete="nickname"></label>
+    <fieldset class="swatches"><legend>Sigil color</legend>${SIGILS.map((c, i) => `<label><input type="radio" name="sig" value="${c}" ${c === sig ? 'checked' : ''} aria-label="Color ${i + 1}"><span style="background:${c}"></span></label>`).join('')}</fieldset>
+    <button class="btn primary" id="p-save">${p ? 'Save profile' : 'Create profile'}</button> <span class="err" id="p-err"></span>
+  </div>`;
+  $('#p-name').focus();
+  $('#p-save').onclick = async () => {
+    const name = $('#p-name').value.trim();
+    if(name.length < 2){ $('#p-err').textContent = 'Use at least 2 characters for your pen name.'; return; }
+    const sigil = (document.querySelector('input[name=sig]:checked') || {}).value || SIGILS[0];
+    try{
+      await API.saveMember({ penName:name, sigil, joinedAt:(p && p.joinedAt) || Date.now() });
+      if(S.mode === 'cloud') S.members[S.uid] = { penName:name, sigil, joinedAt:(p && p.joinedAt) || Date.now() };
+      toast(p ? 'Profile saved' : 'Profile created'); location.hash = p ? '#/' : next;
+      if(location.hash === next) { renderSidebar(); renderMain(); }
+    }catch(e){ writeError(e); }
+  };
+}
+
+/* ---------- hover previews for links ---------- */
+const pop = $('#pop'); let popT = null;
+function hidePop(){ clearTimeout(popT); pop.classList.remove('show'); }
+document.addEventListener('mouseover', e => {
+  const a = e.target.closest && e.target.closest('a.wl[data-id]');
+  if(!a || !matchMedia('(hover: hover)').matches) return;
+  clearTimeout(popT);
+  popT = setTimeout(async () => {
+    const art = S.articles[a.dataset.id]; if(!art) return;
+    const cat = catOf(art);
+    pop.className = 'pop c-' + cat;
+    pop.innerHTML = `${art.image ? `<img data-ref="${esc(art.image)}" alt="">` : ''}<span class="k">${CAT[cat].one}</span><b>${esc(art.title)}</b>${art.summary ? `<p>${esc(art.summary)}</p>` : ''}`;
+    hydrateImages(pop);
+    const r = a.getBoundingClientRect(), w = 300;
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
+    const below = r.bottom + 8, h = pop.offsetHeight || 120;
+    pop.style.top = (below + h > window.innerHeight ? Math.max(8, r.top - h - 8) : below) + 'px';
+    pop.classList.add('show');
+  }, 280);
+});
+document.addEventListener('mouseout', e => { if(e.target.closest && e.target.closest('a.wl[data-id]')) hidePop(); });
+
+/* ---------- shell wiring ---------- */
+$('#menuBtn').onclick = () => $('#shell').classList.add('open');
+$('#scrim').onclick = () => $('#shell').classList.remove('open');
+$('#q').addEventListener('input', runSearch);
+$('#q').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ const first = $('#results a'); if(first) location.hash = first.getAttribute('href'); }
+  if(e.key === 'Escape'){ e.target.value = ''; runSearch(); }
+});
+renderSidebar();
+init();
+</script>
+</body>
+</html>
