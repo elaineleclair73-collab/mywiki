@@ -269,6 +269,13 @@ label.f small,.hint{font-weight:400;color:var(--muted);font-size:.86rem}
 .wide{width:100%}
 .alt{margin:12px 0 0;font-size:.95rem;color:var(--muted)}
 .join code{background:var(--paper2);padding:1px 5px;border-radius:4px}
+.pw{position:relative;display:block}
+.pw input{padding-right:46px}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:36px;border:0;background:none;color:var(--muted);border-radius:6px;display:grid;place-items:center;cursor:pointer;padding:0}
+.eye:hover{color:var(--ink);background:var(--paper2)}
+.codebox{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:clamp(1.25rem,5vw,1.7rem);letter-spacing:.06em;font-weight:700;text-align:center;padding:18px 12px;border:2px dashed var(--accent);border-radius:10px;background:var(--paper);color:var(--ink);user-select:all;overflow-wrap:anywhere}
+.check{display:flex;gap:10px;align-items:center;font-weight:500;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
 @media (max-width:860px){ .auth{grid-template-columns:1fr;gap:28px;margin-top:2vh} }
 </style>
 </head>
@@ -318,6 +325,20 @@ const BASE_URL = location.origin + location.pathname;
 const PEN_DOMAIN = 'pen.worldkeeper.invalid';
 const penHandle = n => String(n || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const penEmail = n => penHandle(n) + '@' + PEN_DOMAIN;
+const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>';
+function pwField(id, label, ac, hint){
+  return `<label class="f">${label}<span class="pw"><input type="password" id="${id}" autocomplete="${ac}" spellcheck="false" autocapitalize="off"><button type="button" class="eye" data-for="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></span>${hint ? `<small>${hint}</small>` : ''}</label>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.eye'); if(!b) return;
+  e.preventDefault();
+  const inp = document.getElementById(b.dataset.for); if(!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  b.setAttribute('aria-pressed', String(show)); b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  b.innerHTML = show ? EYE_OFF : EYE;
+});
 function penProblem(n){
   const t = String(n || '').trim();
   if(t.length < 3 || t.length > 24) return 'Use 3 to 24 characters for your pen name.';
@@ -328,7 +349,7 @@ function penProblem(n){
 
 /* ---------- state ---------- */
 const S = {
-  authReady:false, uid:null, email:'', meta:{}, recovery:false, sentTo:'', notice:'',
+  authReady:false, showCode:'', hasCode:null, uid:null, email:'', meta:{}, recovery:false, sentTo:'', notice:'',
   loaded:false, loadError:'', lastLoad:0,
   articles:{}, profile:null,
   imgCache:new Map(), editing:null, renamingWorld:false, confirmDelete:false, importing:false
@@ -555,6 +576,7 @@ async function loadAll(){
       if(error) throw error;
     }
     S.profile = p ? { pen_name:p.pen_name || '', sigil:p.sigil || SIGILS[0], world:p.world || {}, bookmarks:Array.isArray(p.bookmarks) ? p.bookmarks : [] } : null;
+    try{ const hc = await sb.rpc('has_recovery_code'); S.hasCode = hc.error ? null : !!hc.data; }catch{ S.hasCode = null; }
     S.lastLoad = Date.now();
   }catch(e){ S.loadError = friendly(e); }
   S.loaded = true; onData();
@@ -621,7 +643,7 @@ async function importLocal(){
 
 /* ---------- auth ---------- */
 function resetState(){
-  S.uid = null; S.email = ''; S.meta = {}; S.articles = {}; S.profile = null; S.loaded = false; S.loadError = '';
+  S.uid = null; S.showCode = ''; S.hasCode = null; S.email = ''; S.meta = {}; S.articles = {}; S.profile = null; S.loaded = false; S.loadError = '';
   S.editing = null; S.imgCache.forEach(p => p.then(u => { if(u && u.startsWith('blob:')) URL.revokeObjectURL(u); })); S.imgCache.clear();
 }
 function handleAuth(event, session){
@@ -630,7 +652,7 @@ function handleAuth(event, session){
   if(uid && uid !== S.uid){
     S.uid = uid; S.email = session.user.email || ''; S.meta = session.user.user_metadata || {};
     S.loaded = false; S.sentTo = '';
-    if(['login','signup','forgot'].includes(parseHash().view)) history.replaceState(null, '', location.pathname + location.search + '#/');
+    if(['login','signup','forgot'].includes(parseHash().view) && !S.showCode) history.replaceState(null, '', location.pathname + location.search + '#/');
     render(); loadAll();
   } else if(!uid && S.uid){ resetState(); render(); }
   else { if(session && session.user) S.email = session.user.email || S.email; render(); }
@@ -717,9 +739,10 @@ function renderMain(){
   if(!CONFIGURED) return viewSetup(main);
   if(!sb) return void (main.innerHTML = `<div class="notice">The sign-in library didn’t load. Check your internet connection and reload the page.</div>`);
   if(!S.authReady) return void (main.innerHTML = '<p class="loading">Opening the archive…</p>');
-  if(!S.uid) return viewAuth(main, r.view === 'signup' ? 'signup' : 'login');
+  if(!S.uid) return r.view === 'forgot' ? viewForgot(main) : viewAuth(main, r.view === 'signup' ? 'signup' : 'login');
   if(!S.loaded) return void (main.innerHTML = '<p class="loading">Opening the archive…</p>');
   if(S.loadError) return viewLoadError(main);
+  if(S.showCode) return viewCode(main);
   if(!me() || r.view === 'account') return viewAccount(main, r.params);
   if(r.view === 'cat') return viewCategory(main, r.arg);
   if(r.view === 'article') return viewArticle(main, r.arg);
@@ -753,19 +776,19 @@ function viewAuth(main, kind){
     ? `<form class="auth-card" id="af" novalidate>
       <h2>Create an account</h2>
       <label class="f">Pen name<input id="a-pen" maxlength="24" autocomplete="username" autocapitalize="words" spellcheck="false" placeholder="e.g. Archivist Mara" required><small>This is how you sign in and how others know you. It can’t be changed later.</small></label>
-      <label class="f">Password<input type="password" id="a-pass" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
-      <label class="f">Repeat password<input type="password" id="a-pass2" autocomplete="new-password" required></label>
-      <p class="hint" style="margin:-4px 0 14px">There’s no email on your account, so keep your password somewhere safe. If you forget it, the wiki’s owner can reset it.</p>
+      ${pwField('a-pass', 'Password', 'new-password', 'At least 8 characters.')}
+      ${pwField('a-pass2', 'Repeat password', 'new-password')}
+      <p class="hint" style="margin:-4px 0 14px">Next, you’ll get a recovery code. It lets you reset your password if you ever forget it.</p>
       <button class="btn primary wide" id="a-go">Create account</button>
       <p class="err" id="a-err" role="alert"></p>
       <p class="alt">Already have an account? <a href="#/login">Sign in</a></p></form>`
     : `<form class="auth-card" id="af" novalidate>
       <h2>Sign in</h2>${notice}
       <label class="f">Pen name<input id="a-pen" maxlength="24" autocomplete="username" autocapitalize="words" spellcheck="false" required></label>
-      <label class="f">Password<input type="password" id="a-pass" autocomplete="current-password" required></label>
+      ${pwField('a-pass', 'Password', 'current-password')}
       <button class="btn primary wide" id="a-go">Sign in</button>
       <p class="err" id="a-err" role="alert"></p>
-      <p class="alt">Forgot your password? Ask the wiki’s owner to reset it.</p>
+      <p class="alt"><a href="#/forgot">Forgot your password?</a></p>
       <p class="alt">New here? <a href="#/signup">Create an account</a></p></form>`;
   main.innerHTML = `<div class="auth">${intro}${card}</div>`;
   const form = $('#af'), err = $('#a-err'), go = $('#a-go');
@@ -788,6 +811,7 @@ function viewAuth(main, kind){
         if(error) throw error;
         if(!data.session) throw new Error('Email address not authorized');
         if(data.user && Array.isArray(data.user.identities) && !data.user.identities.length) throw new Error('already registered');
+        try{ const rc = await sb.rpc('create_recovery_code'); if(!rc.error && rc.data){ S.showCode = rc.data; S.hasCode = true; renderMain(); } }catch{}
       } else {
         const { error } = await sb.auth.signInWithPassword({ email:penEmail(pen), password:pass }); if(error) throw error;
       }
@@ -809,9 +833,13 @@ function viewAccount(main, params){
     <button class="btn primary" id="p-save">${p ? 'Save sigil' : 'Save and continue'}</button> <span class="err" id="p-err"></span>
     ${p ? `<hr style="border:0;border-top:1px solid var(--rule);margin:32px 0 20px">
     <h2 class="sec-title" style="font-size:1.3rem">Change password</h2>
-    <label class="f">New password<input type="password" id="pw1" autocomplete="new-password" minlength="8"><small>At least 8 characters.</small></label>
-    <label class="f">Repeat new password<input type="password" id="pw2" autocomplete="new-password"></label>
-    <button class="btn" id="pw-save">Change password</button> <span class="err" id="pw-err"></span>` : ''}
+    ${pwField('pw1', 'New password', 'new-password', 'At least 8 characters.')}
+    ${pwField('pw2', 'Repeat new password', 'new-password')}
+    <button class="btn" id="pw-save">Change password</button> <span class="err" id="pw-err"></span>
+    <hr style="border:0;border-top:1px solid var(--rule);margin:32px 0 20px">
+    <h2 class="sec-title" style="font-size:1.3rem">Recovery code</h2>
+    <p class="hint">${S.hasCode ? 'You have a recovery code. Making a new one stops the old one from working.' : 'You don’t have a recovery code yet. Without one, a forgotten password can only be reset by the wiki’s owner.'}</p>
+    <button class="btn ${S.hasCode ? '' : 'primary'}" id="rc-new">${S.hasCode ? 'Make a new recovery code' : 'Create a recovery code'}</button> <span class="err" id="rc-err"></span>` : ''}
     <hr style="border:0;border-top:1px solid var(--rule);margin:32px 0 20px">
     <button class="btn" id="p-out">Sign out</button>
     <p class="hint">Signing out on a shared computer keeps your world private. Everything stays saved in your account.</p>
@@ -838,7 +866,89 @@ function viewAccount(main, params){
     catch(e){ out.textContent = friendly(e); }
     pw.disabled = false;
   };
+  const rcb = $('#rc-new'); if(rcb) rcb.onclick = () => newRecoveryCode(rcb, $('#rc-err'));
   $('#p-out').onclick = async () => { $('#p-out').disabled = true; await sb.auth.signOut(); location.hash = '#/login'; };
+}
+async function newRecoveryCode(btn, errEl){
+  if(btn) btn.disabled = true;
+  try{
+    const { data, error } = await sb.rpc('create_recovery_code'); if(error) throw error;
+    S.showCode = data; S.hasCode = true; S.codeReturn = location.hash || '#/'; renderMain(); window.scrollTo(0, 0);
+  }catch(e){ if(btn) btn.disabled = false; if(errEl) errEl.textContent = friendly(e); else showError(e); }
+}
+
+/* ---------- recovery code screen ---------- */
+function viewCode(main){
+  const code = S.showCode, pen = (me() && me().pen_name) || '';
+  main.innerHTML = `<div class="join">
+    <h1>Save your recovery code</h1>
+    <p>If you ever forget your password, this code lets you choose a new one from the sign-in page. Each code works once, and you’ll get a fresh one after using it. Keep it somewhere safe, like a notes app, a password manager, or a photo.</p>
+    <div class="codebox" id="codeTxt">${esc(code)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 22px"><button class="btn" id="cCopy">Copy code</button><button class="btn" id="cDl">Download as a file</button></div>
+    <label class="check"><input type="checkbox" id="cOk"> I’ve saved my recovery code</label>
+    <div style="margin-top:16px"><button class="btn primary" id="cGo" disabled>Continue</button></div>
+  </div>`;
+  $('#cOk').onchange = e => { $('#cGo').disabled = !e.target.checked; };
+  $('#cCopy').onclick = async () => {
+    try{ await navigator.clipboard.writeText(code); toast('Code copied'); }
+    catch{ const r = document.createRange(); r.selectNodeContents($('#codeTxt')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Code selected. Copy it with your device’s copy command.'); }
+  };
+  $('#cDl').onclick = () => {
+    const txt = `Worldkeeper recovery code${pen ? ' for ' + pen : ''}\n\n${code}\n\nIf you forget your password, open the wiki, choose "Forgot your password?", and enter your pen name and this code.\nIt works once. You'll get a new code after using it.\n`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain'}));
+    a.download = 'worldkeeper-recovery-code.txt'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  $('#cGo').onclick = () => {
+    const back = S.codeReturn && !/^#\/account/.test(S.codeReturn) ? S.codeReturn : '#/';
+    S.showCode = ''; S.codeReturn = '';
+    if(location.hash === back || (back === '#/' && !location.hash.replace(/^#\/?/, ''))) render(); else location.hash = back;
+  };
+}
+
+/* ---------- forgot password (pen name + recovery code) ---------- */
+function viewForgot(main){
+  main.innerHTML = `<div class="auth"><div class="auth-intro">
+      <h1 class="world-title">Worldkeeper</h1>
+      <p class="tagline">Forgot your password? Your recovery code gets you back in.</p></div>
+    <form class="auth-card" id="af" novalidate>
+      <h2>Reset your password</h2>
+      <label class="f">Pen name<input id="a-pen" maxlength="24" autocomplete="username" autocapitalize="words" spellcheck="false"></label>
+      <label class="f">Recovery code<input id="a-code" maxlength="24" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.05em"></label>
+      ${pwField('a-pass', 'New password', 'new-password', 'At least 8 characters.')}
+      ${pwField('a-pass2', 'Repeat new password', 'new-password')}
+      <button class="btn primary wide" id="a-go">Reset password</button>
+      <p class="err" id="a-err" role="alert"></p>
+      <p class="alt">No recovery code? Ask the wiki’s owner to reset your password.</p>
+      <p class="alt"><a href="#/login">Back to sign in</a></p></form></div>`;
+  const form = $('#af'), err = $('#a-err'), go = $('#a-go');
+  $('#a-pen').focus();
+  form.onsubmit = async e => {
+    e.preventDefault(); err.textContent = '';
+    const pen = $('#a-pen').value.trim(), code = $('#a-code').value.trim(), pass = $('#a-pass').value;
+    if(penHandle(pen).length < 3){ err.textContent = 'Enter your pen name.'; return; }
+    if(code.replace(/[^A-Za-z0-9]/g, '').length !== 16){ err.textContent = 'Recovery codes have 16 letters and numbers, like K7QM-2HXP-9RTA-WF3C.'; return; }
+    if(pass.length < 8){ err.textContent = 'Use at least 8 characters for your new password.'; return; }
+    if(pass !== $('#a-pass2').value){ err.textContent = 'The two passwords don’t match.'; return; }
+    go.disabled = true;
+    try{
+      const { data, error } = await sb.functions.invoke('reset-password', { body:{ pen_name:pen, code, new_password:pass } });
+      if(error){
+        let info = {}; try{ info = await error.context.json(); }catch{}
+        if(info.error === 'wrong_code') throw new Error('That pen name and recovery code don’t match.');
+        if(info.error === 'locked') throw new Error('Too many wrong codes. Wait 15 minutes and try again.');
+        if(info.error === 'weak_password'){
+          if(info.new_code) throw new Error(`That password wasn’t accepted (${info.message || 'too weak'}). Your old code is used up; your new recovery code is ${info.new_code}. Save it, then try again with a stronger password.`);
+          throw new Error('Choose a stronger password (at least 8 characters).');
+        }
+        if(!error.context) throw new Error('Can’t reach the server. Check your internet connection and try again.');
+        throw new Error('Something went wrong on the server. Try again in a minute.');
+      }
+      S.showCode = data && data.new_code || ''; S.codeReturn = '#/';
+      const { error: sErr } = await sb.auth.signInWithPassword({ email:penEmail(pen), password:pass });
+      if(sErr){ S.showCode = ''; err.textContent = 'Your password was changed. Sign in with it now.' + (data && data.new_code ? ` Your new recovery code is ${data.new_code}; save it.` : ''); go.disabled = false; return; }
+      toast('Password changed');
+    }catch(ex){ err.textContent = ex.message || friendly(ex); go.disabled = false; }
+  };
 }
 
 /* ---------- home ---------- */
@@ -848,6 +958,7 @@ function viewHome(main){
   const catsUsed = new Set(all.map(catOf)).size;
   const pend = pendingImport();
   let html = '';
+  if(S.hasCode === false) html += `<div class="notice" style="margin-bottom:24px"><b>Create a recovery code</b> so you can reset your password if you ever forget it.<div style="margin-top:10px"><button class="btn primary small" id="rcHome">Create recovery code</button></div></div>`;
   if(pend) html += `<div class="notice" style="margin-bottom:24px"><b>${pend} ${pend === 1 ? 'article is' : 'articles are'} saved in this browser from before you had an account.</b> Import ${pend === 1 ? 'it' : 'them'} so ${pend === 1 ? 'it’s' : 'they’re'} kept safe in your account.<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn primary small" id="imp" ${S.importing ? 'disabled' : ''}>${S.importing ? 'Importing…' : 'Import into my account'}</button><button class="btn ghost small" id="impNo" ${S.importing ? 'disabled' : ''}>Don’t import</button></div></div>`;
   html += `<header class="hero">
@@ -875,6 +986,7 @@ function viewHome(main){
   if(recent.length) html += `<section class="recent"><h2 class="sec-title">Recently changed</h2><ol>${recent.map(a =>
     `<li class="c-${catOf(a)}"><a href="#/a/${a.id}">${esc(a.title)}</a><span class="tag">${CAT[catOf(a)].one}</span><time>${esc(ago(a.updatedAt))}</time></li>`).join('')}</ol></section>`;
   main.innerHTML = html;
+  const rch = $('#rcHome'); if(rch) rch.onclick = () => newRecoveryCode(rch);
   const imp = $('#imp'); if(imp) imp.onclick = importLocal;
   const impNo = $('#impNo'); if(impNo) impNo.onclick = () => { LS.set('imported', true); renderMain(); };
   $('#renameBtn').onclick = () => { S.renamingWorld = true; renderMain(); $('#w-name').focus(); };
