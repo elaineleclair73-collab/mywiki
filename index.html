@@ -313,6 +313,18 @@ const SIGILS = ['#2A7565','#4352A0','#A23B3B','#76448A','#8E620E','#4A752A','#3D
 const CFG = window.WORLDKEEPER_CONFIG || {};
 const CONFIGURED = /^https:\/\//.test(CFG.url || '') && (CFG.key || '').length > 20 && !/PASTE/.test(CFG.key + CFG.url);
 const BASE_URL = location.origin + location.pathname;
+/* Pen names double as login names. Behind the scenes each one becomes a placeholder address
+   (never emailed) because Supabase accounts need one. "Archivist Mara" -> archivist-mara@pen.worldkeeper.invalid */
+const PEN_DOMAIN = 'pen.worldkeeper.invalid';
+const penHandle = n => String(n || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const penEmail = n => penHandle(n) + '@' + PEN_DOMAIN;
+function penProblem(n){
+  const t = String(n || '').trim();
+  if(t.length < 3 || t.length > 24) return 'Use 3 to 24 characters for your pen name.';
+  if(!/^[A-Za-z0-9 '._-]+$/.test(t)) return 'Pen names can use letters, numbers, spaces, and the symbols - _ . \' only.';
+  if(penHandle(t).length < 3) return 'Use at least 3 letters or numbers in your pen name.';
+  return '';
+}
 
 /* ---------- state ---------- */
 const S = {
@@ -356,12 +368,13 @@ function friendly(e){
   if(/does not exist|Could not find the table|schema cache/i.test(m)) return 'The database isn’t set up yet. Run setup.sql in your Supabase project’s SQL editor.';
   if(/permission denied for table/i.test(m)) return 'The database permissions aren’t set up. Run setup.sql in your Supabase project’s SQL editor.';
   if(/Bucket not found/i.test(m)) return 'Image storage isn’t set up yet. Run setup.sql in your Supabase project’s SQL editor.';
+  if(/already registered|already exists|user_already_exists|profiles_pen_handle_unique|duplicate key/i.test(m)) return 'That pen name is already taken. Try another one.';
+  if(/Email address not authorized|email rate limit|Email address .* is invalid|email_address_invalid/i.test(m)) return 'Sign-up is blocked by a Supabase setting. The wiki’s owner needs to turn off “Confirm email” under Authentication → Sign In / Providers → Email.';
   if(/row-level security|JWT|not authorized|Unauthorized/i.test(m)) return 'Your session has expired. Sign out, then sign in again.';
-  if(/Invalid login credentials/i.test(m)) return 'That email and password don’t match an account.';
-  if(/Email not confirmed/i.test(m)) return 'Confirm your email first. Open the link we sent you, then sign in.';
+  if(/Invalid login credentials/i.test(m)) return 'That pen name and password don’t match an account.';
+  if(/Email not confirmed/i.test(m)) return 'This account isn’t activated yet. The wiki’s owner needs to turn off “Confirm email” in Supabase.';
   if(/rate limit|too many|security purposes/i.test(m)) return 'Too many attempts. Wait a few minutes and try again.';
-  if(/already registered|already exists/i.test(m)) return 'An account already uses that email. Sign in instead.';
-  if(/Password should|password/i.test(m)) return m;
+  if(/Password should|weak|password/i.test(m)) return m.replace(/^Password should/, 'Your password should');
   return m || 'Something went wrong. Try again.';
 }
 const showError = e => toast(friendly(e), true);
@@ -612,7 +625,6 @@ function resetState(){
   S.editing = null; S.imgCache.forEach(p => p.then(u => { if(u && u.startsWith('blob:')) URL.revokeObjectURL(u); })); S.imgCache.clear();
 }
 function handleAuth(event, session){
-  if(event === 'PASSWORD_RECOVERY'){ S.recovery = true; }
   const uid = session && session.user ? session.user.id : null;
   S.authReady = true;
   if(uid && uid !== S.uid){
@@ -705,8 +717,7 @@ function renderMain(){
   if(!CONFIGURED) return viewSetup(main);
   if(!sb) return void (main.innerHTML = `<div class="notice">The sign-in library didn’t load. Check your internet connection and reload the page.</div>`);
   if(!S.authReady) return void (main.innerHTML = '<p class="loading">Opening the archive…</p>');
-  if(S.recovery) return viewAuth(main, 'reset');
-  if(!S.uid) return viewAuth(main, S.sentTo ? 'sent' : (['signup','forgot'].includes(r.view) ? r.view : 'login'));
+  if(!S.uid) return viewAuth(main, r.view === 'signup' ? 'signup' : 'login');
   if(!S.loaded) return void (main.innerHTML = '<p class="loading">Opening the archive…</p>');
   if(S.loadError) return viewLoadError(main);
   if(!me() || r.view === 'account') return viewAccount(main, r.params);
@@ -730,7 +741,7 @@ function viewLoadError(main){
   $('#so').onclick = () => sb.auth.signOut();
 }
 
-/* ---------- sign in / sign up / reset ---------- */
+/* ---------- sign in / sign up ---------- */
 function viewAuth(main, kind){
   const intro = `<div class="auth-intro">
     <h1 class="world-title">Worldkeeper</h1>
@@ -738,71 +749,49 @@ function viewAuth(main, kind){
     <p class="demo nolink">Write about <span class="wl c-character">Queen Ysolde</span>, then mention her in an article about <span class="wl c-place">Harrowmere</span>. Her name becomes a link on its own, colored by what she is.</p>
   </div>`;
   const notice = S.notice ? `<p class="err">${esc(S.notice)}</p>` : '';
-  let card = '';
-  if(kind === 'login') card = `<form class="auth-card" id="af" novalidate>
+  const card = kind === 'signup'
+    ? `<form class="auth-card" id="af" novalidate>
+      <h2>Create an account</h2>
+      <label class="f">Pen name<input id="a-pen" maxlength="24" autocomplete="username" autocapitalize="words" spellcheck="false" placeholder="e.g. Archivist Mara" required><small>This is how you sign in and how others know you. It can’t be changed later.</small></label>
+      <label class="f">Password<input type="password" id="a-pass" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
+      <label class="f">Repeat password<input type="password" id="a-pass2" autocomplete="new-password" required></label>
+      <p class="hint" style="margin:-4px 0 14px">There’s no email on your account, so keep your password somewhere safe. If you forget it, the wiki’s owner can reset it.</p>
+      <button class="btn primary wide" id="a-go">Create account</button>
+      <p class="err" id="a-err" role="alert"></p>
+      <p class="alt">Already have an account? <a href="#/login">Sign in</a></p></form>`
+    : `<form class="auth-card" id="af" novalidate>
       <h2>Sign in</h2>${notice}
-      <label class="f">Email<input type="email" id="a-email" autocomplete="email" required></label>
+      <label class="f">Pen name<input id="a-pen" maxlength="24" autocomplete="username" autocapitalize="words" spellcheck="false" required></label>
       <label class="f">Password<input type="password" id="a-pass" autocomplete="current-password" required></label>
       <button class="btn primary wide" id="a-go">Sign in</button>
       <p class="err" id="a-err" role="alert"></p>
-      <p class="alt"><a href="#/forgot">Forgot your password?</a></p>
+      <p class="alt">Forgot your password? Ask the wiki’s owner to reset it.</p>
       <p class="alt">New here? <a href="#/signup">Create an account</a></p></form>`;
-  if(kind === 'signup') card = `<form class="auth-card" id="af" novalidate>
-      <h2>Create an account</h2>
-      <label class="f">Pen name<input id="a-pen" maxlength="40" autocomplete="nickname" placeholder="e.g. Archivist Mara" required></label>
-      <label class="f">Email<input type="email" id="a-email" autocomplete="email" required></label>
-      <label class="f">Password<input type="password" id="a-pass" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
-      <button class="btn primary wide" id="a-go">Create account</button>
-      <p class="err" id="a-err" role="alert"></p>
-      <p class="alt">Already have an account? <a href="#/login">Sign in</a></p></form>`;
-  if(kind === 'forgot') card = `<form class="auth-card" id="af" novalidate>
-      <h2>Reset your password</h2>${notice}
-      <p class="alt" style="margin:0 0 14px">Enter your account’s email and we’ll send you a link to choose a new password.</p>
-      <label class="f">Email<input type="email" id="a-email" autocomplete="email" required></label>
-      <button class="btn primary wide" id="a-go">Send reset link</button>
-      <p class="err" id="a-err" role="alert"></p>
-      <p class="alt"><a href="#/login">Back to sign in</a></p></form>`;
-  if(kind === 'reset') card = `<form class="auth-card" id="af" novalidate>
-      <h2>Choose a new password</h2>
-      <label class="f">New password<input type="password" id="a-pass" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
-      <button class="btn primary wide" id="a-go">Save new password</button>
-      <p class="err" id="a-err" role="alert"></p></form>`;
-  if(kind === 'sent') card = `<div class="auth-card">
-      <h2>Check your inbox</h2>
-      <p>We sent a link to <b>${esc(S.sentTo)}</b>. Open it to confirm your account, then sign in here.</p>
-      <p class="alt">No email after a few minutes? Check your spam folder.</p>
-      <button class="btn wide" id="a-back">Back to sign in</button></div>`;
   main.innerHTML = `<div class="auth">${intro}${card}</div>`;
-  if(kind === 'sent'){ $('#a-back').onclick = () => { S.sentTo = ''; location.hash = '#/login'; renderMain(); }; return; }
   const form = $('#af'), err = $('#a-err'), go = $('#a-go');
-  const first = form.querySelector('input'); if(first) first.focus();
+  $('#a-pen').focus();
   form.onsubmit = async e => {
     e.preventDefault(); err.textContent = ''; S.notice = '';
-    const email = ($('#a-email') || {}).value ? $('#a-email').value.trim() : '';
-    const pass = ($('#a-pass') || {}).value || '';
-    if($('#a-email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent = 'Enter a valid email address.'; return; }
-    if((kind === 'signup' || kind === 'reset') && pass.length < 8){ err.textContent = 'Use at least 8 characters for your password.'; return; }
-    if(kind === 'login' && !pass){ err.textContent = 'Enter your password.'; return; }
-    const pen = kind === 'signup' ? $('#a-pen').value.trim() : '';
-    if(kind === 'signup' && pen.length < 2){ err.textContent = 'Use at least 2 characters for your pen name.'; return; }
+    const pen = $('#a-pen').value.trim(), pass = $('#a-pass').value;
+    if(kind === 'signup'){
+      const bad = penProblem(pen); if(bad){ err.textContent = bad; return; }
+      if(pass.length < 8){ err.textContent = 'Use at least 8 characters for your password.'; return; }
+      if(pass !== $('#a-pass2').value){ err.textContent = 'The two passwords don’t match.'; return; }
+    } else {
+      if(penHandle(pen).length < 3){ err.textContent = 'Enter your pen name.'; return; }
+      if(!pass){ err.textContent = 'Enter your password.'; return; }
+    }
     go.disabled = true;
     try{
-      if(kind === 'login'){
-        const { error } = await sb.auth.signInWithPassword({ email, password:pass }); if(error) throw error;
-      } else if(kind === 'signup'){
-        const { data, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ pen_name:pen }, emailRedirectTo:BASE_URL } });
+      if(kind === 'signup'){
+        const { data, error } = await sb.auth.signUp({ email:penEmail(pen), password:pass, options:{ data:{ pen_name:pen } } });
         if(error) throw error;
-        if(!data.session){ S.sentTo = email; renderMain(); return; }
-      } else if(kind === 'forgot'){
-        const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo:BASE_URL }); if(error) throw error;
-        form.innerHTML = `<h2>Check your inbox</h2><p>If an account uses <b>${esc(email)}</b>, a reset link is on its way. Open it on this device to choose a new password.</p><p class="alt"><a href="#/login">Back to sign in</a></p>`;
-        return;
-      } else if(kind === 'reset'){
-        const { error } = await sb.auth.updateUser({ password:pass }); if(error) throw error;
-        S.recovery = false; toast('Password changed'); location.hash = '#/'; render(); return;
+        if(!data.session) throw new Error('Email address not authorized');
+        if(data.user && Array.isArray(data.user.identities) && !data.user.identities.length) throw new Error('already registered');
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email:penEmail(pen), password:pass }); if(error) throw error;
       }
-    }catch(ex){ err.textContent = friendly(ex); }
-    go.disabled = false;
+    }catch(ex){ err.textContent = friendly(ex); go.disabled = false; }
   };
 }
 
@@ -813,26 +802,41 @@ function viewAccount(main, params){
   const startName = p ? p.pen_name : (S.meta.pen_name || '');
   main.innerHTML = `<div class="join">
     <h1>${p ? 'Account and profile' : 'Finish your profile'}</h1>
-    <p>Signed in as <b>${esc(S.email)}</b>. Your articles, images and bookmarks are saved to this account, so signing in on any device brings them back.</p>
-    <label class="f">Pen name<input id="p-name" maxlength="40" value="${esc(startName)}" placeholder="e.g. Archivist Mara" autocomplete="nickname"></label>
+    <p>Your articles, images and bookmarks are saved to this account, so signing in on any device brings them back.</p>
+    ${p ? `<p class="f" style="margin:0 0 14px"><b>Pen name</b><br><span style="font-family:var(--serif);font-size:1.4rem;color:var(--ink)">${esc(p.pen_name)}</span><br><small class="hint">You sign in with this name. It can’t be changed.</small></p>`
+        : `<label class="f">Pen name<input id="p-name" maxlength="24" value="${esc(startName)}" placeholder="e.g. Archivist Mara" autocomplete="username"><small>It can’t be changed later.</small></label>`}
     <fieldset class="swatches"><legend>Sigil color</legend>${SIGILS.map((c, i) => `<label><input type="radio" name="sig" value="${c}" ${c === sig ? 'checked' : ''} aria-label="Color ${i + 1}"><span style="background:${c}"></span></label>`).join('')}</fieldset>
-    <button class="btn primary" id="p-save">${p ? 'Save profile' : 'Save and continue'}</button> <span class="err" id="p-err"></span>
+    <button class="btn primary" id="p-save">${p ? 'Save sigil' : 'Save and continue'}</button> <span class="err" id="p-err"></span>
+    ${p ? `<hr style="border:0;border-top:1px solid var(--rule);margin:32px 0 20px">
+    <h2 class="sec-title" style="font-size:1.3rem">Change password</h2>
+    <label class="f">New password<input type="password" id="pw1" autocomplete="new-password" minlength="8"><small>At least 8 characters.</small></label>
+    <label class="f">Repeat new password<input type="password" id="pw2" autocomplete="new-password"></label>
+    <button class="btn" id="pw-save">Change password</button> <span class="err" id="pw-err"></span>` : ''}
     <hr style="border:0;border-top:1px solid var(--rule);margin:32px 0 20px">
     <button class="btn" id="p-out">Sign out</button>
     <p class="hint">Signing out on a shared computer keeps your world private. Everything stays saved in your account.</p>
   </div>`;
   if(!p) $('#p-name').focus();
   $('#p-save').onclick = async () => {
-    const name = $('#p-name').value.trim();
-    if(name.length < 2){ $('#p-err').textContent = 'Use at least 2 characters for your pen name.'; return; }
+    const name = p ? p.pen_name : $('#p-name').value.trim();
+    if(!p){ const bad = penProblem(name); if(bad){ $('#p-err').textContent = bad; return; } }
     const sigil = (document.querySelector('input[name=sig]:checked') || {}).value || SIGILS[0];
     $('#p-save').disabled = true;
     try{
       await API.saveProfile({ pen_name:name, sigil });
-      toast(p ? 'Profile saved' : 'Profile saved. Welcome!');
+      toast(p ? 'Sigil saved' : 'Profile saved. Welcome!');
       const target = p ? '#/' : next;
       if(location.hash === target || (target === '#/' && !location.hash.replace(/^#\/?/, ''))) render(); else location.hash = target;
     }catch(e){ $('#p-save').disabled = false; $('#p-err').textContent = friendly(e); }
+  };
+  const pw = $('#pw-save'); if(pw) pw.onclick = async () => {
+    const a = $('#pw1').value, b = $('#pw2').value, out = $('#pw-err'); out.textContent = '';
+    if(a.length < 8){ out.textContent = 'Use at least 8 characters.'; return; }
+    if(a !== b){ out.textContent = 'The two passwords don’t match.'; return; }
+    pw.disabled = true;
+    try{ const { error } = await sb.auth.updateUser({ password:a }); if(error) throw error; $('#pw1').value = $('#pw2').value = ''; toast('Password changed'); }
+    catch(e){ out.textContent = friendly(e); }
+    pw.disabled = false;
   };
   $('#p-out').onclick = async () => { $('#p-out').disabled = true; await sb.auth.signOut(); location.hash = '#/login'; };
 }
